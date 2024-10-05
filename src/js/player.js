@@ -1,3 +1,8 @@
+import { i18n } from './i18n'
+import Events from './events'
+import User from './user'
+import Template from './template'
+
 class DPlayer {
   constructor(options) {
     this.options = handleOption({
@@ -14,5 +19,14 @@ class DPlayer {
     this.user = new User(this)
     this.container = this.options.container
     this.noticeList = {}
+
+    this.template = new Template({
+      container: this.container,
+      options: this.options,
+      index: index,
+      tran: this.tran,
+    })
   }
 }
+
+export default DPlayer
