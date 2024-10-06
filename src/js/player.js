@@ -6,6 +6,7 @@ import Template from './template'
 import Icons from './icons'
 import utils from './utils'
 import Bar from './bar'
+import Controller from './controller'
 
 let index = 0
 const instances = []
@@ -13,8 +14,6 @@ const instances = []
 class DPlayer {
   constructor(options) {
     console.log(options)
-
-    console.log('options')
 
     this.options = handleOption({
       preload: options.video.type === 'webtorrent' ? 'none' : 'metadata',
@@ -66,7 +65,44 @@ class DPlayer {
   }
 
   play(fromNative) {
-    console.log('123123')
+    this.paused = false
+
+    // switch player icon
+    this.template.playButton.innerHTML = Icons.pause
+    this.template.mobilePlayButton.innerHTML = Icons.pause
+    if (!fromNative) {
+      const playedPromise = Promise.resolve(this.video.play())
+      playedPromise
+        .catch(() => {
+          this.video.pause()
+        })
+        .then(() => {})
+    }
+
+    this.container.classList.remove('dplayer-paused')
+    this.container.classList.add('dplayer-playing')
+
+    console.log('play')
+  }
+
+  pause(fromNative) {
+    this.template.playButton.innerHTML = Icons.play
+    this.template.mobilePlayButton.innerHTML = Icons.play
+
+    if (!fromNative) {
+      this.video.pause()
+    }
+
+    this.container.classList.remove('dplayer-playing')
+    this.container.classList.add('dplayer-paused')
+  }
+
+  toggle() {
+    if (this.video.paused) {
+      this.play()
+    } else {
+      this.pause()
+    }
   }
 }
 
