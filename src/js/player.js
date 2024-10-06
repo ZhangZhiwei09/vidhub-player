@@ -62,6 +62,30 @@ class DPlayer {
     this.controller = new Controller(this)
   }
 
+  /**
+   * Seek video
+   */
+  seek(time) {
+    time = Math.max(time, 0)
+    if (this.video.duration) {
+      time = Math.min(time, this.video.duration)
+    }
+    if (this.video.currentTime < time) {
+      this.notice(`${this.tran('ff').replace('%s', (time - this.video.currentTime).toFixed(0))}`)
+    } else if (this.video.currentTime > time) {
+      this.notice(`${this.tran('rew').replace('%s', (this.video.currentTime - time).toFixed(0))}`)
+    }
+
+    this.video.currentTime = time
+
+    if (this.danmaku) {
+      this.danmaku.seek()
+    }
+
+    this.bar.set('played', time / this.video.duration, 'width')
+    this.template.ptime.innerHTML = utils.secondToTime(time)
+  }
+
   play(fromNative) {
     this.paused = false
 
@@ -100,6 +124,43 @@ class DPlayer {
       this.play()
     } else {
       this.pause()
+    }
+  }
+
+  notice(text, time = 2000, opacity = 0.8, id) {
+    let oldNoticeEle
+    if (id) {
+      oldNoticeEle = document.getElementById(`dplayer-notice-${id}`)
+      if (oldNoticeEle) {
+        oldNoticeEle.innerHTML = text
+      }
+      if (this.noticeList[id]) {
+        clearTimeout(this.noticeList[id])
+        this.noticeList[id] = null
+      }
+    }
+    if (!oldNoticeEle) {
+      const notice = Template.NewNotice(text, opacity, id)
+      this.template.noticeList.appendChild(notice)
+      oldNoticeEle = notice
+    }
+
+    this.events.trigger('notice_show', oldNoticeEle)
+
+    if (time > 0) {
+      this.noticeList[id] = setTimeout(
+        (function (e, dp) {
+          return () => {
+            e.addEventListener('animationend', () => {
+              dp.template.noticeList.removeChild(e)
+            })
+            e.classList.add('remove-notice')
+            dp.events.trigger('notice_hide')
+            dp.noticeList[id] = null
+          }
+        })(oldNoticeEle, this),
+        time
+      )
     }
   }
 }
