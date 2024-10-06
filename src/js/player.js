@@ -53,8 +53,6 @@ class DPlayer {
       tran: this.tran,
     })
 
-    console.log(this.template, '====')
-
     this.video = this.template.video
 
     this.bar = new Bar(this.template)
