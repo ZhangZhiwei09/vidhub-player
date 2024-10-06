@@ -6,6 +6,7 @@ import Template from './template'
 import Icons from './icons'
 import utils from './utils'
 import Bar from './bar'
+import Bezel from './bezel'
 import Controller from './controller'
 
 let index = 0
@@ -56,8 +57,8 @@ class DPlayer {
     this.video = this.template.video
 
     this.bar = new Bar(this.template)
-
-    // this.bezel = new Bezel(this.template.bezel)
+    // 视频中央播放图标
+    this.bezel = new Bezel(this.template.bezel)
 
     this.controller = new Controller(this)
   }
@@ -88,7 +89,9 @@ class DPlayer {
 
   play(fromNative) {
     this.paused = false
-
+    if (this.video.paused && !utils.isMobile) {
+      this.bezel.switch(Icons.play)
+    }
     // switch player icon
     this.template.playButton.innerHTML = Icons.pause
     this.template.mobilePlayButton.innerHTML = Icons.pause
@@ -108,6 +111,13 @@ class DPlayer {
   }
 
   pause(fromNative) {
+    this.paused = true
+    this.container.classList.remove('dplayer-loading')
+
+    if (!this.video.paused && !utils.isMobile) {
+      this.bezel.switch(Icons.pause)
+    }
+
     this.template.playButton.innerHTML = Icons.play
     this.template.mobilePlayButton.innerHTML = Icons.play
 
