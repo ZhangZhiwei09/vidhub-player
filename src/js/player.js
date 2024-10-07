@@ -2,8 +2,10 @@ import { i18n } from './i18n'
 import handleOption from './options'
 import Events from './events'
 import FullScreen from './fullscreen'
+import HotKey from './hotkey'
 import User from './user'
 import Template from './template'
+import Timer from './timer'
 import Icons from './icons'
 import utils from './utils'
 import Bar from './bar'
@@ -64,6 +66,25 @@ class DPlayer {
     this.fullScreen = new FullScreen(this)
 
     this.controller = new Controller(this)
+
+    this.docClickFun = () => {
+      this.focus = false
+    }
+
+    this.containerClickFun = () => {
+      this.focus = true
+    }
+
+    document.addEventListener('click', this.docClickFun, true)
+    this.container.addEventListener('click', this.containerClickFun, true)
+
+    this.paused = true
+
+    this.timer = new Timer(this)
+
+    this.hotkey = new HotKey(this)
+
+    this.initVideo(this.video, (this.quality && this.quality.type) || this.options.video.type)
   }
 
   /**
@@ -140,6 +161,13 @@ class DPlayer {
     }
   }
 
+  /**
+   * attach event
+   */
+  on(name, callback) {
+    this.events.on(name, callback)
+  }
+
   notice(text, time = 2000, opacity = 0.8, id) {
     let oldNoticeEle
     if (id) {
@@ -193,6 +221,101 @@ class DPlayer {
 
   speed(rate) {
     this.video.playbackRate = rate
+  }
+
+  destroy() {
+    instances.splice(instances.indexOf(this), 1)
+    this.pause()
+    document.removeEventListener('click', this.docClickFun, true)
+    this.container.removeEventListener('click', this.containerClickFun, true)
+    this.fullScreen.destroy()
+    this.hotkey.destroy()
+    this.contextmenu.destroy()
+    this.controller.destroy()
+    this.timer.destroy()
+    this.video.src = ''
+    this.container.innerHTML = ''
+    this.events.trigger('destroy')
+  }
+
+  initMSE(video, type) {}
+
+  initVideo(video, type) {
+    this.initMSE(video, type)
+
+    /**
+     * video events
+     */
+    // show video time: the metadata has loaded or changed
+    this.on('durationchange', () => {
+      // compatibility: Android browsers will output 1 or Infinity at first
+      if (video.duration !== 1 && video.duration !== Infinity) {
+        this.template.dtime.innerHTML = utils.secondToTime(video.duration)
+      }
+    })
+
+    // show video loaded bar: to inform interested parties of progress downloading the media
+    this.on('progress', () => {
+      const percentage = video.buffered.length
+        ? video.buffered.end(video.buffered.length - 1) / video.duration
+        : 0
+      this.bar.set('loaded', percentage, 'width')
+    })
+
+    // video download error: an error occurs
+    this.on('error', () => {
+      if (!this.video.error) {
+        // Not a video load error, may be poster load failed, see #307
+        return
+      }
+      this.tran &&
+        this.notice &&
+        this.type !== 'webtorrent' &&
+        this.notice(this.tran('video-failed'))
+    })
+
+    // video end
+    this.on('ended', () => {
+      this.bar.set('played', 1, 'width')
+      if (!this.setting.loop) {
+        this.pause()
+      } else {
+        this.seek(0)
+        this.play()
+      }
+      if (this.danmaku) {
+        this.danmaku.danIndex = 0
+      }
+    })
+
+    this.on('play', () => {
+      if (this.paused) {
+        this.play(true)
+      }
+    })
+
+    this.on('pause', () => {
+      if (!this.paused) {
+        this.pause(true)
+      }
+    })
+
+    this.on('timeupdate', () => {
+      if (!this.moveBar) {
+        this.bar.set('played', this.video.currentTime / this.video.duration, 'width')
+      }
+      const currentTime = utils.secondToTime(this.video.currentTime)
+      if (this.template.ptime.innerHTML !== currentTime) {
+        this.template.ptime.innerHTML = currentTime
+      }
+    })
+
+    for (let i = 0; i < this.events.videoEvents.length; i++) {
+      video.addEventListener(this.events.videoEvents[i], (e) => {
+        this.events.trigger(this.events.videoEvents[i], e)
+      })
+    }
+    // this.volume(this.user.get('volume'), true, true)
   }
 }
 
