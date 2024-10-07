@@ -1,6 +1,7 @@
 import { i18n } from './i18n'
 import handleOption from './options'
 import Events from './events'
+import FullScreen from './fullscreen'
 import User from './user'
 import Template from './template'
 import Icons from './icons'
@@ -59,6 +60,8 @@ class DPlayer {
     this.bar = new Bar(this.template)
     // 视频中央播放图标
     this.bezel = new Bezel(this.template.bezel)
+
+    this.fullScreen = new FullScreen(this)
 
     this.controller = new Controller(this)
   }
@@ -172,6 +175,24 @@ class DPlayer {
         time
       )
     }
+  }
+
+  resize() {
+    if (this.danmaku) {
+      this.danmaku.resize()
+    }
+    if (this.controller.thumbnails) {
+      this.controller.thumbnails.resize(
+        160,
+        (this.video.videoHeight / this.video.videoWidth) * 160,
+        this.template.barWrap.offsetWidth
+      )
+    }
+    this.events.trigger('resize')
+  }
+
+  speed(rate) {
+    this.video.playbackRate = rate
   }
 }
 
