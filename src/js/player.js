@@ -1,16 +1,19 @@
-import { i18n } from './i18n'
+import utils from './utils'
 import handleOption from './options'
+import { i18n } from './i18n'
+import Template from './template'
+import Icons from './icons'
+
 import Events from './events'
 import FullScreen from './fullscreen'
-import HotKey from './hotkey'
 import User from './user'
-import Template from './template'
-import Timer from './timer'
-import Icons from './icons'
-import utils from './utils'
+
 import Bar from './bar'
+import Timer from './timer'
 import Bezel from './bezel'
 import Controller from './controller'
+import Setting from './setting'
+import HotKey from './hotkey'
 
 let index = 0
 const instances = []
@@ -66,6 +69,9 @@ class DPlayer {
     this.fullScreen = new FullScreen(this)
 
     this.controller = new Controller(this)
+
+    this.setting = new Setting(this)
+    this.plugins = {}
 
     this.docClickFun = () => {
       this.focus = false
