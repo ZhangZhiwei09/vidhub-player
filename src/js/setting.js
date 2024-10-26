@@ -7,15 +7,13 @@ class Setting {
     this.player.template.mask.addEventListener('click', () => {
       this.hide()
     })
-
     this.player.template.settingButton.addEventListener('click', () => {
       this.show()
     })
 
+    // loop
     this.loop = this.player.options.loop
-
     this.player.template.loopToggle.checked = this.loop
-
     this.player.template.loop.addEventListener('click', () => {
       this.player.template.loopToggle.checked = !this.player.template.loopToggle.checked
       if (this.player.template.loopToggle.checked) {
@@ -26,16 +24,15 @@ class Setting {
       this.hide()
     })
 
+    // show danmaku
     this.showDanmaku = this.player.user.get('danmaku')
     if (!this.showDanmaku) {
       this.player.danmaku && this.player.danmaku.hide()
     }
-    this.player.template.showDanmakuToggle.checked = this.showDanmaku()
-
+    this.player.template.showDanmakuToggle.checked = this.showDanmaku
     this.player.template.showDanmaku.addEventListener('click', () => {
       this.player.template.showDanmakuToggle.checked =
         !this.player.template.showDanmakuToggle.checked
-
       if (this.player.template.showDanmakuToggle.checked) {
         this.showDanmaku = true
         this.player.danmaku.show()
@@ -43,7 +40,6 @@ class Setting {
         this.showDanmaku = false
         this.player.danmaku.hide()
       }
-
       this.player.user.set('danmaku', this.showDanmaku ? 1 : 0)
       this.hide()
     })
@@ -70,7 +66,6 @@ class Setting {
       this.player.template.settingBox.classList.add('dplayer-setting-box-narrow')
       this.player.template.settingBox.classList.add('dplayer-setting-box-speed')
     })
-
     for (let i = 0; i < this.player.template.speedItem.length; i++) {
       this.player.template.speedItem[i].addEventListener('click', () => {
         this.player.speed(this.player.template.speedItem[i].dataset.speed)
@@ -85,7 +80,6 @@ class Setting {
         this.player.bar.set('danmaku', percentage, 'width')
         this.player.user.set('opacity', percentage)
       })
-
       this.player.danmaku.opacity(this.player.user.get('opacity'))
 
       const danmakuMove = (event) => {
@@ -98,7 +92,6 @@ class Setting {
         percentage = Math.min(percentage, 1)
         this.player.danmaku.opacity(percentage)
       }
-
       const danmakuUp = () => {
         document.removeEventListener(utils.nameMap.dragEnd, danmakuUp)
         document.removeEventListener(utils.nameMap.dragMove, danmakuMove)
@@ -115,7 +108,6 @@ class Setting {
         percentage = Math.min(percentage, 1)
         this.player.danmaku.opacity(percentage)
       })
-
       this.player.template.danmakuOpacityBarWrapWrap.addEventListener(
         utils.nameMap.dragStart,
         () => {
