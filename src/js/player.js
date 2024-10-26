@@ -13,6 +13,7 @@ import Timer from './timer'
 import Bezel from './bezel'
 import Controller from './controller'
 import Setting from './setting'
+import Comment from './comment'
 import HotKey from './hotkey'
 
 let index = 0
@@ -69,6 +70,45 @@ class DPlayer {
     this.fullScreen = new FullScreen(this)
 
     this.controller = new Controller(this)
+
+    if (this.options.danmaku) {
+      // this.danmaku = new Danmaku({
+      //   player: this,
+      //   container: this.template.danmaku,
+      //   opacity: this.user.get('opacity'),
+      //   callback: () => {
+      //     setTimeout(() => {
+      //       this.template.danmakuLoading.style.display = 'none'
+
+      //       // autoplay
+      //       if (this.options.autoplay) {
+      //         this.play()
+      //       }
+      //     }, 0)
+      //   },
+      //   error: (msg) => {
+      //     this.notice(msg)
+      //   },
+      //   apiBackend: this.options.apiBackend,
+      //   borderColor: this.options.theme,
+      //   height: this.arrow ? 24 : 30,
+      //   time: () => this.video.currentTime,
+      //   unlimited: this.user.get('unlimited'),
+      //   api: {
+      //     id: this.options.danmaku.id,
+      //     address: this.options.danmaku.api,
+      //     token: this.options.danmaku.token,
+      //     maximum: this.options.danmaku.maximum,
+      //     addition: this.options.danmaku.addition,
+      //     user: this.options.danmaku.user,
+      //     speedRate: this.options.danmaku.speedRate,
+      //   },
+      //   events: this.events,
+      //   tran: (msg) => this.tran(msg),
+      // })
+
+      this.comment = new Comment(this)
+    }
 
     this.setting = new Setting(this)
     this.plugins = {}
