@@ -1,3 +1,5 @@
+import Promise from 'promise-polyfill'
+
 import utils from './utils'
 import handleOption from './options'
 import { i18n } from './i18n'
@@ -7,7 +9,8 @@ import Danmaku from './danmaku'
 import Events from './events'
 import FullScreen from './fullscreen'
 import User from './user'
-
+import Subtitle from './subtitle'
+import Subtitles from './subtitles'
 import Bar from './bar'
 import Timer from './timer'
 import Bezel from './bezel'
@@ -16,7 +19,6 @@ import Setting from './setting'
 import Comment from './comment'
 import HotKey from './hotkey'
 import ContextMenu from './contextmenu'
-import tplVideo from '../template/video.art'
 
 let index = 0
 const instances = []
@@ -203,6 +205,49 @@ class DPlayer {
     this.container.classList.add('dplayer-paused')
   }
 
+  switchVolumeIcon() {
+    if (this.volume() >= 0.95) {
+      this.template.volumeIcon.innerHTML = Icons.volumeUp
+    } else if (this.volume() > 0) {
+      this.template.volumeIcon.innerHTML = Icons.volumeDown
+    } else {
+      this.template.volumeIcon.innerHTML = Icons.volumeOff
+    }
+  }
+
+  /**
+   * Set volume
+   */
+  volume(percentage, nostorage, nonotice) {
+    percentage = parseFloat(percentage)
+    if (!isNaN(percentage)) {
+      percentage = Math.max(percentage, 0)
+      percentage = Math.min(percentage, 1)
+      this.bar.set('volume', percentage, 'width')
+      const formatPercentage = `${(percentage * 100).toFixed(0)}%`
+      this.template.volumeBarWrapWrap.dataset.balloon = formatPercentage
+      if (!nostorage) {
+        this.user.set('volume', percentage)
+      }
+      if (!nonotice) {
+        this.notice(
+          `${this.tran('volume')} ${(percentage * 100).toFixed(0)}%`,
+          undefined,
+          undefined,
+          'volume'
+        )
+      }
+
+      this.video.volume = percentage
+      if (this.video.muted) {
+        this.video.muted = false
+      }
+      this.switchVolumeIcon()
+    }
+
+    return this.video.volume
+  }
+
   toggle() {
     if (this.video.paused) {
       this.play()
@@ -365,7 +410,24 @@ class DPlayer {
         this.events.trigger(this.events.videoEvents[i], e)
       })
     }
-    // this.volume(this.user.get('volume'), true, true)
+    this.volume(this.user.get('volume'), true, true)
+
+    if (this.options.subtitle) {
+      // init old single subtitle function(sub show and style)
+      this.subtitle = new Subtitle(
+        this.template.subtitle,
+        this.video,
+        this.options.subtitle,
+        this.events
+      )
+      // init multi subtitles function(sub update)
+      if (Array.isArray(this.options.subtitle.url)) {
+        this.subtitles = new Subtitles(this)
+      }
+      if (!this.user.get('subtitle')) {
+        this.subtitle.hide()
+      }
+    }
   }
 }
 
