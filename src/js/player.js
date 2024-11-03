@@ -26,6 +26,12 @@ let index = 0
 const instances = []
 
 class DPlayer {
+  /**
+   * DPlayer constructor function
+   *
+   * @param {Object} options - See README
+   * @constructor
+   */
   constructor(options) {
     this.options = handleOption({
       preload: options.video.type === 'webtorrent' ? 'none' : 'metadata',
@@ -36,7 +42,6 @@ class DPlayer {
       this.qualityIndex = this.options.video.defaultQuality
       this.quality = this.options.video.quality[this.options.video.defaultQuality]
     }
-
     this.tran = new i18n(this.options.lang).tran
     this.events = new Events()
     this.user = new User(this)
@@ -45,23 +50,67 @@ class DPlayer {
 
     this.container.classList.add('dplayer')
 
-    // 不设置弹幕
     if (!this.options.danmaku) {
       this.container.classList.add('dplayer-no-danmaku')
     }
-    // 直播
     if (this.options.live) {
       this.container.classList.add('dplayer-live')
     } else {
       this.container.classList.remove('dplayer-live')
     }
-    // 移动端
     if (utils.isMobile) {
       this.container.classList.add('dplayer-mobile')
     }
     this.arrow = this.container.offsetWidth <= 500
     if (this.arrow) {
       this.container.classList.add('dplayer-arrow')
+    }
+
+    // multi subtitles defaultSubtitle add index, off option
+    if (this.options.subtitle) {
+      if (Array.isArray(this.options.subtitle.url)) {
+        const offSubtitle = {
+          subtitle: '',
+          lang: 'off',
+        }
+        this.options.subtitle.url.push(offSubtitle)
+        if (this.options.subtitle.defaultSubtitle) {
+          if (typeof this.options.subtitle.defaultSubtitle === 'string') {
+            // defaultSubtitle is string, match in lang then name.
+            this.options.subtitle.index = this.options.subtitle.url.findIndex((sub) =>
+              /* if (sub.lang === this.options.subtitle.defaultSubtitle) {
+                            return true;
+                        } else if (sub.name === this.options.subtitle.defaultSubtitle) {
+                            return true;
+                        } else {
+                            return false;
+                        } */
+              sub.lang === this.options.subtitle.defaultSubtitle
+                ? true
+                : sub.name === this.options.subtitle.defaultSubtitle
+                  ? true
+                  : false
+            )
+          } else if (typeof this.options.subtitle.defaultSubtitle === 'number') {
+            // defaultSubtitle is int, directly use for index
+            this.options.subtitle.index = this.options.subtitle.defaultSubtitle
+          }
+        }
+        // defaultSubtitle not match or not exist or index bound(when defaultSubtitle is int), try browser language.
+        if (
+          this.options.subtitle.index === -1 ||
+          !this.options.subtitle.index ||
+          this.options.subtitle.index > this.options.subtitle.url.length - 1
+        ) {
+          this.options.subtitle.index = this.options.subtitle.url.findIndex(
+            (sub) => sub.lang === this.options.lang
+          )
+        }
+        // browser language not match, default off title
+        if (this.options.subtitle.index === -1) {
+          this.options.subtitle.index = this.options.subtitle.url.length - 1
+        }
+      }
     }
 
     this.template = new Template({
@@ -74,7 +123,7 @@ class DPlayer {
     this.video = this.template.video
 
     this.bar = new Bar(this.template)
-    // 视频中央播放图标
+
     this.bezel = new Bezel(this.template.bezel)
 
     this.fullScreen = new FullScreen(this)
@@ -122,15 +171,12 @@ class DPlayer {
 
     this.setting = new Setting(this)
     this.plugins = {}
-
     this.docClickFun = () => {
       this.focus = false
     }
-
     this.containerClickFun = () => {
       this.focus = true
     }
-
     document.addEventListener('click', this.docClickFun, true)
     this.container.addEventListener('click', this.containerClickFun, true)
 
@@ -180,12 +226,15 @@ class DPlayer {
     this.template.ptime.innerHTML = utils.secondToTime(time)
   }
 
+  /**
+   * Play video
+   */
   play(fromNative) {
     this.paused = false
     if (this.video.paused && !utils.isMobile) {
       this.bezel.switch(Icons.play)
     }
-    // switch player icon
+
     this.template.playButton.innerHTML = Icons.pause
     this.template.mobilePlayButton.innerHTML = Icons.pause
 
@@ -193,11 +242,10 @@ class DPlayer {
       const playedPromise = Promise.resolve(this.video.play())
       playedPromise
         .catch(() => {
-          this.video.pause()
+          this.pause()
         })
         .then(() => {})
     }
-
     this.timer.enable('loading')
     this.container.classList.remove('dplayer-paused')
     this.container.classList.add('dplayer-playing')
@@ -213,6 +261,9 @@ class DPlayer {
     }
   }
 
+  /**
+   * Pause video
+   */
   pause(fromNative) {
     this.paused = true
     this.container.classList.remove('dplayer-loading')
@@ -223,13 +274,15 @@ class DPlayer {
 
     this.template.playButton.innerHTML = Icons.play
     this.template.mobilePlayButton.innerHTML = Icons.play
-
     if (!fromNative) {
       this.video.pause()
     }
-
+    this.timer.disable('loading')
     this.container.classList.remove('dplayer-playing')
     this.container.classList.add('dplayer-paused')
+    if (this.danmaku) {
+      this.danmaku.pause()
+    }
   }
 
   switchVolumeIcon() {
@@ -275,6 +328,9 @@ class DPlayer {
     return this.video.volume
   }
 
+  /**
+   * Toggle between play and pause
+   */
   toggle() {
     if (this.video.paused) {
       this.play()
@@ -290,77 +346,173 @@ class DPlayer {
     this.events.on(name, callback)
   }
 
-  notice(text, time = 2000, opacity = 0.8, id) {
-    let oldNoticeEle
-    if (id) {
-      oldNoticeEle = document.getElementById(`dplayer-notice-${id}`)
-      if (oldNoticeEle) {
-        oldNoticeEle.innerHTML = text
-      }
-      if (this.noticeList[id]) {
-        clearTimeout(this.noticeList[id])
-        this.noticeList[id] = null
-      }
-    }
-    if (!oldNoticeEle) {
-      const notice = Template.NewNotice(text, opacity, id)
-      this.template.noticeList.appendChild(notice)
-      oldNoticeEle = notice
-    }
-
-    this.events.trigger('notice_show', oldNoticeEle)
-
-    if (time > 0) {
-      this.noticeList[id] = setTimeout(
-        (function (e, dp) {
-          return () => {
-            e.addEventListener('animationend', () => {
-              dp.template.noticeList.removeChild(e)
-            })
-            e.classList.add('remove-notice')
-            dp.events.trigger('notice_hide')
-            dp.noticeList[id] = null
-          }
-        })(oldNoticeEle, this),
-        time
-      )
-    }
-  }
-
-  resize() {
-    if (this.danmaku) {
-      this.danmaku.resize()
-    }
-    if (this.controller.thumbnails) {
-      this.controller.thumbnails.resize(
-        160,
-        (this.video.videoHeight / this.video.videoWidth) * 160,
-        this.template.barWrap.offsetWidth
-      )
-    }
-    this.events.trigger('resize')
-  }
-
-  speed(rate) {
-    this.video.playbackRate = rate
-  }
-
-  destroy() {
-    instances.splice(instances.indexOf(this), 1)
+  /**
+   * Switch to a new video
+   *
+   * @param {Object} video - new video info
+   * @param {Object} danmaku - new danmaku info
+   */
+  switchVideo(video, danmakuAPI) {
     this.pause()
-    document.removeEventListener('click', this.docClickFun, true)
-    this.container.removeEventListener('click', this.containerClickFun, true)
-    this.fullScreen.destroy()
-    this.hotkey.destroy()
-    this.contextmenu.destroy()
-    this.controller.destroy()
-    this.timer.destroy()
-    this.video.src = ''
-    this.container.innerHTML = ''
-    this.events.trigger('destroy')
+    this.video.poster = video.pic ? video.pic : ''
+    this.video.src = video.url
+    this.initMSE(this.video, video.type || 'auto')
+    if (danmakuAPI) {
+      this.template.danmakuLoading.style.display = 'block'
+      this.bar.set('played', 0, 'width')
+      this.bar.set('loaded', 0, 'width')
+      this.template.ptime.innerHTML = '00:00'
+      this.template.danmaku.innerHTML = ''
+      if (this.danmaku) {
+        this.danmaku.reload({
+          id: danmakuAPI.id,
+          address: danmakuAPI.api,
+          token: danmakuAPI.token,
+          maximum: danmakuAPI.maximum,
+          addition: danmakuAPI.addition,
+          user: danmakuAPI.user,
+        })
+      }
+    }
   }
 
-  initMSE(video, type) {}
+  initMSE(video, type) {
+    this.type = type
+    if (this.options.video.customType && this.options.video.customType[type]) {
+      if (
+        Object.prototype.toString.call(this.options.video.customType[type]) === '[object Function]'
+      ) {
+        this.options.video.customType[type](this.video, this)
+      } else {
+        console.error(`Illegal customType: ${type}`)
+      }
+    } else {
+      if (this.type === 'auto') {
+        if (/m3u8(#|\?|$)/i.exec(video.src)) {
+          this.type = 'hls'
+        } else if (/.flv(#|\?|$)/i.exec(video.src)) {
+          this.type = 'flv'
+        } else if (/.mpd(#|\?|$)/i.exec(video.src)) {
+          this.type = 'dash'
+        } else {
+          this.type = 'normal'
+        }
+      }
+      if (
+        this.type === 'hls' &&
+        (video.canPlayType('application/x-mpegURL') ||
+          video.canPlayType('application/vnd.apple.mpegURL'))
+      ) {
+        this.type = 'normal'
+      }
+
+      switch (this.type) {
+        // https://github.com/video-dev/hls.js
+        case 'hls':
+          if (window.Hls) {
+            if (window.Hls.isSupported()) {
+              const options = this.options.pluginOptions.hls
+              const hls = new window.Hls(options)
+              this.plugins.hls = hls
+              hls.loadSource(video.src)
+              hls.attachMedia(video)
+              this.events.on('destroy', () => {
+                hls.destroy()
+                delete this.plugins.hls
+              })
+            } else {
+              this.notice('Error: Hls is not supported.')
+            }
+          } else {
+            this.notice("Error: Can't find Hls.")
+          }
+          break
+
+        // https://github.com/Bilibili/flv.js
+        case 'flv':
+          if (window.flvjs) {
+            if (window.flvjs.isSupported()) {
+              const flvPlayer = window.flvjs.createPlayer(
+                Object.assign(this.options.pluginOptions.flv.mediaDataSource || {}, {
+                  type: 'flv',
+                  url: video.src,
+                }),
+                this.options.pluginOptions.flv.config
+              )
+              this.plugins.flvjs = flvPlayer
+              flvPlayer.attachMediaElement(video)
+              flvPlayer.load()
+              this.events.on('destroy', () => {
+                flvPlayer.unload()
+                flvPlayer.detachMediaElement()
+                flvPlayer.destroy()
+                delete this.plugins.flvjs
+              })
+            } else {
+              this.notice('Error: flvjs is not supported.')
+            }
+          } else {
+            this.notice("Error: Can't find flvjs.")
+          }
+          break
+
+        // https://github.com/Dash-Industry-Forum/dash.js
+        case 'dash':
+          if (window.dashjs) {
+            const dashjsPlayer = window.dashjs
+              .MediaPlayer()
+              .create()
+              .initialize(video, video.src, false)
+            const options = this.options.pluginOptions.dash
+            dashjsPlayer.updateSettings(options)
+            this.plugins.dash = dashjsPlayer
+            this.events.on('destroy', () => {
+              window.dashjs.MediaPlayer().reset()
+              delete this.plugins.dash
+            })
+          } else {
+            this.notice("Error: Can't find dashjs.")
+          }
+          break
+
+        // https://github.com/webtorrent/webtorrent
+        case 'webtorrent':
+          if (window.WebTorrent) {
+            if (window.WebTorrent.WEBRTC_SUPPORT) {
+              this.container.classList.add('dplayer-loading')
+              const options = this.options.pluginOptions.webtorrent
+              const client = new window.WebTorrent(options)
+              this.plugins.webtorrent = client
+              const torrentId = video.src
+              video.src = ''
+              video.preload = 'metadata'
+              video.addEventListener(
+                'durationchange',
+                () => this.container.classList.remove('dplayer-loading'),
+                { once: true }
+              )
+              client.add(torrentId, (torrent) => {
+                const file = torrent.files.find((file) => file.name.endsWith('.mp4'))
+                file.renderTo(this.video, {
+                  autoplay: this.options.autoplay,
+                  controls: false,
+                })
+              })
+              this.events.on('destroy', () => {
+                client.remove(torrentId)
+                client.destroy()
+                delete this.plugins.webtorrent
+              })
+            } else {
+              this.notice('Error: Webtorrent is not supported.')
+            }
+          } else {
+            this.notice("Error: Can't find Webtorrent.")
+          }
+          break
+      }
+    }
+  }
 
   initVideo(video, type) {
     this.initMSE(video, type)
@@ -437,6 +589,7 @@ class DPlayer {
         this.events.trigger(this.events.videoEvents[i], e)
       })
     }
+
     this.volume(this.user.get('volume'), true, true)
 
     if (this.options.subtitle) {
@@ -455,6 +608,166 @@ class DPlayer {
         this.subtitle.hide()
       }
     }
+  }
+
+  switchQuality(index) {
+    index = typeof index === 'string' ? parseInt(index) : index
+    if (this.qualityIndex === index || this.switchingQuality) {
+      return
+    } else {
+      this.prevIndex = this.qualityIndex
+      this.qualityIndex = index
+    }
+    this.switchingQuality = true
+    this.quality = this.options.video.quality[index]
+    this.template.qualityButton.innerHTML = this.quality.name
+
+    const paused = this.video.paused
+    this.video.pause()
+    const videoHTML = tplVideo({
+      current: false,
+      pic: null,
+      screenshot: this.options.screenshot,
+      preload: 'auto',
+      url: this.quality.url,
+      subtitle: this.options.subtitle,
+    })
+    const videoEle = new DOMParser().parseFromString(videoHTML, 'text/html').body.firstChild
+    this.template.videoWrap.insertBefore(
+      videoEle,
+      this.template.videoWrap.getElementsByTagName('div')[0]
+    )
+    this.prevVideo = this.video
+    this.video = videoEle
+    this.initVideo(this.video, this.options.video.type)
+    this.seek(this.prevVideo.currentTime)
+    this.notice(
+      `${this.tran('switching-quality').replace('%q', this.quality.name)}`,
+      -1,
+      undefined,
+      'switch-quality'
+    )
+    this.events.trigger('quality_start', this.quality)
+
+    this.on('canplay', () => {
+      if (this.prevVideo) {
+        if (this.video.currentTime !== this.prevVideo.currentTime) {
+          this.seek(this.prevVideo.currentTime)
+          return
+        }
+        this.template.videoWrap.removeChild(this.prevVideo)
+        this.video.classList.add('dplayer-video-current')
+        if (!paused) {
+          this.video.play()
+        }
+        this.prevVideo = null
+        this.notice(
+          `${this.tran('switched-quality').replace('%q', this.quality.name)}`,
+          undefined,
+          undefined,
+          'switch-quality'
+        )
+        this.switchingQuality = false
+
+        this.events.trigger('quality_end')
+      }
+    })
+
+    this.on('error', () => {
+      if (!this.video.error) {
+        return
+      }
+      if (this.prevVideo) {
+        this.template.videoWrap.removeChild(this.video)
+        this.video = this.prevVideo
+        if (!paused) {
+          this.video.play()
+        }
+        this.qualityIndex = this.prevIndex
+        this.quality = this.options.video.quality[this.qualityIndex]
+        this.noticeTime = setTimeout(() => {
+          this.template.notice.style.opacity = 0
+          this.events.trigger('notice_hide')
+        }, 3000)
+        this.prevVideo = null
+        this.switchingQuality = false
+      }
+    })
+  }
+
+  notice(text, time = 2000, opacity = 0.8, id) {
+    let oldNoticeEle
+    if (id) {
+      oldNoticeEle = document.getElementById(`dplayer-notice-${id}`)
+      if (oldNoticeEle) {
+        oldNoticeEle.innerHTML = text
+      }
+      if (this.noticeList[id]) {
+        clearTimeout(this.noticeList[id])
+        this.noticeList[id] = null
+      }
+    }
+    if (!oldNoticeEle) {
+      const notice = Template.NewNotice(text, opacity, id)
+      this.template.noticeList.appendChild(notice)
+      oldNoticeEle = notice
+    }
+
+    this.events.trigger('notice_show', oldNoticeEle)
+
+    if (time > 0) {
+      this.noticeList[id] = setTimeout(
+        (function (e, dp) {
+          return () => {
+            e.addEventListener('animationend', () => {
+              dp.template.noticeList.removeChild(e)
+            })
+            e.classList.add('remove-notice')
+            dp.events.trigger('notice_hide')
+            dp.noticeList[id] = null
+          }
+        })(oldNoticeEle, this),
+        time
+      )
+    }
+  }
+
+  resize() {
+    if (this.danmaku) {
+      this.danmaku.resize()
+    }
+    if (this.controller.thumbnails) {
+      this.controller.thumbnails.resize(
+        160,
+        (this.video.videoHeight / this.video.videoWidth) * 160,
+        this.template.barWrap.offsetWidth
+      )
+    }
+    this.events.trigger('resize')
+  }
+
+  speed(rate) {
+    this.video.playbackRate = rate
+  }
+
+  destroy() {
+    instances.splice(instances.indexOf(this), 1)
+    this.pause()
+    document.removeEventListener('click', this.docClickFun, true)
+    this.container.removeEventListener('click', this.containerClickFun, true)
+    this.fullScreen.destroy()
+    this.hotkey.destroy()
+    this.contextmenu.destroy()
+    this.controller.destroy()
+    this.timer.destroy()
+    this.video.src = ''
+    this.container.innerHTML = ''
+    this.events.trigger('destroy')
+  }
+
+  static get version() {
+    /* global DPLAYER_VERSION */
+    return DPLAYER_VERSION
   }
 }
 
