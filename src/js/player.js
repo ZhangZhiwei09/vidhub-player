@@ -19,18 +19,24 @@ import Setting from './setting'
 import Comment from './comment'
 import HotKey from './hotkey'
 import ContextMenu from './contextmenu'
+import InfoPanel from './info-panel'
+import tplVideo from '../template/video.art'
 
 let index = 0
 const instances = []
 
 class DPlayer {
   constructor(options) {
-    console.log(options)
-
     this.options = handleOption({
       preload: options.video.type === 'webtorrent' ? 'none' : 'metadata',
       ...options,
     })
+
+    if (this.options.video.quality) {
+      this.qualityIndex = this.options.video.defaultQuality
+      this.quality = this.options.video.quality[this.options.video.defaultQuality]
+    }
+
     this.tran = new i18n(this.options.lang).tran
     this.events = new Events()
     this.user = new User(this)
@@ -137,6 +143,17 @@ class DPlayer {
     this.contextmenu = new ContextMenu(this)
 
     this.initVideo(this.video, (this.quality && this.quality.type) || this.options.video.type)
+
+    this.infoPanel = new InfoPanel(this)
+
+    if (!this.danmaku && this.options.autoplay) {
+      this.play()
+    }
+
+    this.moveBar = false
+
+    index++
+    instances.push(this)
   }
 
   /**
@@ -171,6 +188,7 @@ class DPlayer {
     // switch player icon
     this.template.playButton.innerHTML = Icons.pause
     this.template.mobilePlayButton.innerHTML = Icons.pause
+
     if (!fromNative) {
       const playedPromise = Promise.resolve(this.video.play())
       playedPromise
@@ -180,10 +198,19 @@ class DPlayer {
         .then(() => {})
     }
 
+    this.timer.enable('loading')
     this.container.classList.remove('dplayer-paused')
     this.container.classList.add('dplayer-playing')
-
-    console.log('play')
+    if (this.danmaku) {
+      this.danmaku.play()
+    }
+    if (this.options.mutex) {
+      for (let i = 0; i < instances.length; i++) {
+        if (this !== instances[i]) {
+          instances[i].pause()
+        }
+      }
+    }
   }
 
   pause(fromNative) {
